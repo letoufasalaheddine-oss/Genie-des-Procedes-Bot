@@ -128,52 +128,50 @@ def get_new_posts():
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    articles = soup.find_all("article")
-
-    if not articles:
-        print("لم يتم العثور على أي إعلانات.")
-        return []
-
     last_post = load_last_post()
 
     new_posts = []
 
-    # المرور من الأحدث إلى الأقدم
-    for article in articles:
+    # البحث عن جميع الروابط داخل الصفحة
+    links = soup.find_all("a", href=True)
 
-        h2 = article.find(["h2", "h3"])
+    for a in links:
 
-        if not h2:
-            continue
+        title = a.get_text(" ", strip=True)
 
-        a = h2.find("a", href=True)
-
-        if not a:
-            continue
-
-        title = a.get_text(strip=True)
+        link = a["href"].strip()
 
         if not title:
             continue
 
-        link = a["href"].strip()
+        # تجاهل الروابط غير الخاصة بالإعلانات
+        if "/post/" not in link:
+            continue
 
         if not link.startswith("http"):
             link = "https://faculty.univ-eloued.dz" + link
 
-        # إذا وصلنا إلى آخر إعلان منشور نتوقف
+        # التوقف عند آخر إعلان منشور
         if link == last_post:
             break
 
-        article_text = article.get_text(" ", strip=True)
-
-        if is_valid_post(title) or is_valid_post(article_text):
+        # التأكد من أن الإعلان يخص القسم أو إعلان عام
+        if is_valid_post(title):
             new_posts.append((title, link))
 
-    # نعيدها من الأقدم إلى الأحدث
-    new_posts.reverse()
+    # إزالة التكرار
+    unique_posts = []
+    seen = set()
 
-    return new_posts
+    for post in new_posts:
+        if post[1] not in seen:
+            unique_posts.append(post)
+            seen.add(post[1])
+
+    # ترتيب من الأقدم إلى الأحدث
+    unique_posts.reverse()
+
+    return unique_posts
 
 
 def main():
