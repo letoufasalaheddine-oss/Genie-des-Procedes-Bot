@@ -113,7 +113,7 @@ def is_valid_post(text):
 
     return False
 
-def get_latest_post():
+def get_new_posts():
 
     headers = {
         "User-Agent": (
@@ -128,17 +128,19 @@ def get_latest_post():
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # البحث عن جميع المقالات
     articles = soup.find_all("article")
 
     if not articles:
         print("لم يتم العثور على أي إعلانات.")
-        return None, None
+        return []
 
-    # المرور على الإعلانات من الأحدث إلى الأقدم
+    last_post = load_last_post()
+
+    new_posts = []
+
+    # المرور من الأحدث إلى الأقدم
     for article in articles:
 
-        # البحث عن عنوان الإعلان
         h2 = article.find(["h2", "h3"])
 
         if not h2:
@@ -159,37 +161,39 @@ def get_latest_post():
         if not link.startswith("http"):
             link = "https://faculty.univ-eloued.dz" + link
 
-        # النص الكامل للإعلان
+        # إذا وصلنا إلى آخر إعلان منشور نتوقف
+        if link == last_post:
+            break
+
         article_text = article.get_text(" ", strip=True)
 
-        # نشر إعلانات القسم أو الإعلانات العامة
         if is_valid_post(title) or is_valid_post(article_text):
-            return title, link
+            new_posts.append((title, link))
 
-    return None, None
+    # نعيدها من الأقدم إلى الأحدث
+    new_posts.reverse()
+
+    return new_posts
 
 
 def main():
     try:
-        title, link = get_latest_post()
+        new_posts = get_new_posts()
 
-        if not title or not link:
-            print("لا يوجد إعلان جديد يخص قسم هندسة الطرائق والبتروكيمياء.")
+        if not new_posts:
+            print("لا يوجد إعلان جديد.")
             return
 
-        last_post = load_last_post()
+        # إرسال جميع الإعلانات من الأقدم إلى الأحدث
+        for title, link in new_posts:
+            print(f"إرسال: {title}")
+            send_telegram(title, link)
 
-        if link == last_post:
-            print("تم نشر هذا الإعلان سابقًا.")
-            return
+        # حفظ أحدث إعلان فقط بعد نجاح الإرسال
+        latest_link = new_posts[-1][1]
+        save_last_post(latest_link)
 
-        print(f"إعلان جديد: {title}")
-
-        send_telegram(title, link)
-
-        save_last_post(link)
-
-        print("تم إرسال الإعلان إلى تيليجرام بنجاح.")
+        print(f"تم إرسال {len(new_posts)} إعلان(ات) بنجاح.")
 
     except Exception as e:
         print(f"حدث خطأ: {e}")
